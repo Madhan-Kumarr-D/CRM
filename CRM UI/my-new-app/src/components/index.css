@@ -1,0 +1,137 @@
+.cord{
+  border: #f2f2f2;
+}
+
+
+
+
+/* ===================================== */
+/* 1. LAYOUT: Ensure Content is Visible */
+/* ===================================== */
+.main-content-area {
+    margin-left: 250px; /* This matches your sidebar width */
+    display: flex;
+    justify-content: center; /* Horizontally centers the card */
+    align-items: center;     /* Vertically centers the card */
+    min-height: 100vh;
+    
+    /* Use 'flex-grow' instead of 'calc' for better reliability */
+    flex-grow: 1; 
+    
+    background-color: #f4f4f4;
+    box-sizing: border-box;
+    padding: 30px;
+}
+
+/* ===================================== */
+/* 2. CARD STYLE */
+/* ===================================== */
+.form-card {
+    background-color: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    width: 100%;       /* Allow it to be responsive */
+    max-width: 450px;  /* But keep it from getting too big */
+    margin: 0;         /* Remove '0 auto' */
+}
+
+.form-card h2 {
+    color: #333;
+    margin-top: 0;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+
+/* ===================================== */
+/* 3. FORM ELEMENTS */
+/* ===================================== */
+
+.form-card form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Space between form elements */
+}
+
+.form-card label {
+    font-weight: bold;
+    color: #555;
+    margin-bottom: -10px; /* Pull label closer to input */
+}
+
+.form-input {
+    padding: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+    width: 100%; /* Ensures input fills the card width */
+    box-sizing: border-box; /* Includes padding/border in the 100% width */
+}
+
+.form-input:focus {
+    border-color: #04AA6D; /* Highlight border on focus */
+    box-shadow: 0 0 5px rgba(4, 170, 109, 0.3);
+    outline: none;
+}
+
+/* ===================================== */
+/* 4. SUBMIT BUTTON */
+/* ===================================== */
+.submit-button {
+    background-color: #04AA6D; /* Same green as your 'active' module link */
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background-color 0.2s ease;
+}
+
+.submit-button:hover {
+    background-color: #038a5a; /* Slightly darker green on hover */
+}
+
+/* body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+ 
+  padding-left: 200px; 
+} */
+
+.topnav {
+  /* PINS the bar to the viewport */
+  position: fixed; 
+  /* Sets the height to 100% of the viewport height */
+  height: 100vh; 
+  /* Pins it to the left edge */
+  left: 0; 
+  /* Ensures it starts at the very top */
+  top: 0; 
+  
+  width: 250px; 
+  background-color: #333;
+}
+
+.topnav a {
+  display: block; 
+  text-align: left; 
+  
+  color: #f2f2f2;
+  padding: 14px 16px;
+  text-decoration: none;
+  font-size: 17px;
+}
+
+.topnav a:hover {
+  background-color: #35fd03;
+  color: black;
+}
+
+.topnav a.active {
+  background-color: #04AA6D;
+  color: white;
+}
+

@@ -1,0 +1,31 @@
+package com.example.demo.Service;
+
+import com.example.demo.Model.Field;
+import com.example.demo.Repository.FieldRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+
+@Service
+public class FieldService {
+    @Autowired
+    FieldRepository field;
+    public List<Field> getModuleField(String ModuleApiName) {
+        System.out.println("SUCCESS FULLY ENTERED THE CONSOLE MODULE API NAME [ inside service layer ] - "+ModuleApiName);
+        return field.getModuleField(ModuleApiName);
+    }
+
+    public Map<String,String> createModuleField(String moduleApiName, Map<String,String> fieldData) {
+    return field.createModuleField(moduleApiName,fieldData);
+    }
+
+    public Field updateModuleField(String moduleApiName, Field fieldData) {
+    return field.updateModuleField(moduleApiName,fieldData);
+    }
+
+    public String deleteModuleField(String moduleApiName, Long fieldID) {
+        return field.deleteModuleField(moduleApiName,fieldID);
+    }
+}
