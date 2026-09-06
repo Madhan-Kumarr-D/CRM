@@ -1,0 +1,99 @@
+DSA
+
+Hashing - collision method will have
+
+
+Graph
+Directed graph
+Undirected graph
+Node are the circle in a graph 
+
+
+If there is a cycle in the graph it should be called as cyclic graph 
+
+If no cycle present it’s an acyclic graph 
+
+Path definition- the two adjacent node mentioned in a path should always be connected directly and during travel in path no nodes should be appear twice
+
+
+Undirected graph:
+
+All attached to a node weather coming in or going out will count as degree of that node, the total degree of the node will be the twice the total number of edges in the graph 
+
+Directed graph:
+
+It has in degree and out degree
+
+if csyle exists some graphs fail for topological sorting [ most important ]
+
+if we the sorting technique is dynamic it is topological sorting [ most important ]
+
+Graph Characteristic			,Best Algorithm				,Time Complexity			,Why?
+Unweighted (or Unit Weights)		,BFS,					O(V+E),					No need to sort weights; first arrival is always the shortest.
+Directed Acyclic (DAG),			Topological Sort,			O(V+E),					Linear processing guarantees we naturally process nodes in order of reachability.
+Weighted + Positive + Cycles,		Dijkstra,				O(ElogV),				The priority queue safely navigates varied weights and loops.
+Weighted + Negative Edges,		Bellman-Ford,				O(V×E),					Safely relaxes all edges repeatedly to account for negative discounts.
+
+
+topologicall sort [ kahnn's algorithm also does same work but in complex way][ valid directed and acysclic]
+
+give the loop from 0 to n nodes order them child -> parent -> grand parent -> gg parent order which is called topologicall order
+
+
+bellman ford
+
+from given node minimum cost to reach all other node 
+
+mark source node as 0 in int[n] n- number of nodes
+
+loop thourgh all given edges n-1 times and update distance value in the int[n] array with below logic
+
+if dist[n1]+weight < dist[n2]
+ dist[n2] = dist[n1]+weight
+
+
+djistr [ efficient than bellman form but not work for negative edges]
+
+do the same above thing instead of looping n-1 times use priority queue to store the bfs distances for looping
+
+
+
+floyd warshalls
+
+shortest path between from any node to any node
+
+will be stored in a matrix n*n  lets say arr[3][5] -> min(3->i and i->5)[i->[0 to n]]
+
+it should run n-1 times of [n*n [i,j] n2 loop] and store minimum distace between each nodes in a graph
+
+
+
+minimum spanning tree 
+
+it han n- edges that are the miniumum to connect all the edges
+
+prims algo
+
+same as the dijistra all the poped edge are from the priority queue are [part of the mst]
+
+
+dis joint dsa
+
+either all the nodes will stores any one ultimate parent of thier group
+
+else every node store their parent by iteration you will get the ultimate parent.
+
+using this you can get mst as well
+
+
+Stack and queue
+
+implementing stack with queue
+
+every time a push happen the queue n-1 enqueue and dequeue shoudl happen
+
+implementing queue with the stack
+
+two stacks [enqueue stack and dequeue stack] during enqueue all elements should be placed in enqueue stack, 
+
+if dequeue happen all the elements should be placed in dequeue stack

@@ -1,0 +1,65 @@
+implementing stack using queue
+
+pop and getting top will be normal if push happens all the elemetns in front should be (size) indiexes i -> i+size , i+1 -> i+1+size
+
+
+implementing queue using stack
+
+you should have two stacks named enqueue stack and a dequeue stack enqueue and dequeue should be done on the respective stacks as pop operation
+
+Note - if enqueue should happen all the elecments should be tranfered to enqueue stack and the push should be done
+
+Note - if dequeue should happen all the elecments should be tranfered to dequeue stack and the pop should be done
+
+
+infix to postfix
+
+operands directly pushed to answer string
+
+operators should be placed on the stack and the operators with low priority cannot be placed over the operators with high priority,  
+
+brackets can be placed without priority problem, of the lower priority symbol comes either till bracket will be poped or till the lower or same priority sybor arrives.
+
+if close beacket comes poped till the open bracket
+
+if there is no elements left in the expression then all the elements in the stck should be poped and added in the answer string.
+
+
+
+infis to prefix
+
+
+reverse the entire expression
+
+reverse all the brackets in the expression
+
+controlled infix to postfix [ here only the symbols are poped out once the symbol of lower prority comes even if the symbols of same priority was not poped out] apart from this all the other 
+rules were exactly the same
+
+reverse the answer string.
+
+
+Post fix to infix
+
+here operands will be stored in the stack
+
+if operator comes just pop two times from the stack contrcut expresion (pop2 symbol pop1) and put it back to the stack.
+
+
+prefix to infix
+
+exatly like the post fix to infix but the iteration of the expression should be done in reverse [ right to tleft] and (pop1 symbol pop 2) and put it back to the stack.
+
+postfix to prefix
+
+iteration should be done from left to the right same as postfix to infix but the procedure is if the operand comes added in the stack and if operator comes pop 
+[symbol pop1 pop2] and put it into the stack
+
+prefix to post fix
+similair to the prefix to infix iterate from right to left put all the operands into the stack, if operator comes [pop1 pop2 symbol] 
+
+IMportant -> using stack getting previous smaller eleemnt for each element in a stack,
+using stack getting previous greater eleemnt for each element in a stack,
+using stack getting next smaller eleemnt for each element in a stack,
+using stack getting next greater eleemnt for each element in a stack,
+will be too important.

@@ -1,0 +1,181 @@
+react is an component by compoenet[ tree structured rendering mechanism]
+
+at head you should import everything you want
+
+at middle there should be a function and it should have some logic and it should return a java script based html tags.
+
+at bottom it should have export statment to export the function
+
+_________________________________________________________________________________________
+
+usestate - a veriable and a setter function will be bound together and when a state variable is modified then react re-renders the specific component [te componenet where the usestate variable recsides]
+
+syntax :
+
+const [ variableName,SetValue ] = useState([ give any value])
+
+_________________________________________________________________________________________
+
+use effect - it will take a anonymous function as input that set of instructions will be executed when a state in a component is changed 
+
+syntax [ at the  particular component ]
+
+useEffect(()=>{ a fucntion that executes on any chage of state},[Variablename_of the state,...]
+
+if the second list was left as empty list then it will only run once and will not executed again
+
+! mostly the data loading part will be done inside useeffect
+_________________________________________________________________________________________
+ref hook [ syncronous][use state is asyncronous ]
+let refConut = useRef(0);
+update
+refConut.current++;
+
+it is alternative of the usestate and will not rerender the componenet, and it only updates the value of the useref.
+_________________________________________________________________________________________
+
+sub topic undet use effect[]
+cleanup function - at the end of the use effect function if ew return anythiong it will be considered as clean up funciton and it will be executed when the componenet is replaced with other componenet
+#inside useeffect
+const controller = new AbortController();
+const signal = controller.signal;
+
+should pass signal to api call eg - fetch('api url',{signal})
+
+#inside return anaonymous function [ clean up funcition]
+controller.abort();
+_________________________________________________________________________________________
+
+react will batch update everything 
+
+updation of the state variable in a function can be done by anaonymous function, if the operations were done inside the nanonymous function then it will updated at the instant
+
+setCount(variable => variable+process)
+
+
+_________________________________________________________________________________________
+custom hook
+
+combination of usestate and use effect can be kept as custom hook template
+
+syntax :
+
+import usestate and useeffect
+
+const useAction = (param) => {
+your usestate codes
+
+your useEffect codes
+
+return [values should be returned in array]
+
+}
+
+export default useAction;
+
+
+parent file custom hook [ hook function]
+
+const [var1,var2,var3] = useAction(param)
+_________________________________________________________________________________________
+
+promise:
+
+funciton createpromise(){
+
+return new Promise((resolve,reject)=>{ 
+
+if(success)
+resolve("success")
+else
+reject("failed")
+}
+);
+}
+
+without using await handling api requests [ cannot assign to variable ]
+
+function handlePromise(){
+createpromise() //function call
+.then(  // executes by wating for the promise when it returns resolve
+(message)=>
+console.log(message);
+).catch(  // executes by wating for the promise when it returns reject
+(message)=>
+console.log(message);
+).finally(  // executes whatever returned
+(message)=>
+console.log(message);
+)
+
+
+if we need to store the values in the variable we must use async and await in the function
+
+async function handlePromise(){ //function shouled be async
+try{
+let result = await createpromise() // value should await for the api data retrival
+}
+catch(  // executes by wating for the promise when it returns reject
+(message)=>
+console.log(message);
+).finally(  // executes whatever returned
+(message)=>
+console.log(message);
+)
+_________________________________________________________________________________________
+routing
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Home />,
+  },
+  {
+    path: "/about",
+    element: <About />,
+  },
+  {
+    path: "*",
+    element: <NotFound />,
+  },
+]);
+
+export default function App() {
+  return <RouterProvider router={router} />;
+}
+<link to="URL"> moduel<Link/> [ link tag only works for this usecase ]
+it must be imorted as well
+
+
+_________________________________________________________________________________________
+
+Context hook in react [ pass data to grand children component]
+!!will be available on all child
+export const variable = createContext();
+<dataContext.Provider value = {any data}>
+paste the child component here
+<dataContext.Provider/>
+
+#garnd child page
+import {dataContext} from './Home';
+
+const data = useContext(dataContext)
+
+__________________________________________________________________________________
+
+navigate hook
+
+it can chage anything into a button, add onclick to div so it an be chaged into a button
+
+
+import useNavigate from "react-router-dom";
+const navigate = useNavigate();
+eg - onClick = {()=>{navigate('/post')}
+
+__________________________________________________________________________________
+
+useParams!!! will get the value fomr the url 
+
+import useParams
+
+const { id } = useParams();

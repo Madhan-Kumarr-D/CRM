@@ -1,0 +1,396 @@
+leet code grapgh series
+
+75,547,542,733,994,1559,130,1020,785,802,207,210,797,212,127,1091,126,2149,54,560,128,152,2139,2285,2078,2615,376,1976,787,1631,1334,120,64,63,188,123,1584,1319,721,827,32
+
+
+
+most important:
+
+for shortest path finding djistra algorithm is the general one
+
+if they have uniform weighted edges -> we should do bfs
+
+if they is acyclic [ no cycle] -> topological dorting shoulbe used.
+
+
+Distict Island problem
+
+class Solution {
+
+    int countDistinctIslands(int[][] grid) {
+        Set<ArrayList<String>> res = new HashSet<>();
+        
+        for(int i=0;i<grid.length;i++){
+            for(int j=0;j<grid[0].length;j++){
+                if(grid[i][j]==1){
+                    ArrayList<String> arr = new ArrayList<>();
+                check(arr,grid,i,j,i,j);
+                res.add(arr);
+                }
+            }
+        }
+        return res.size();
+    }
+    public void check(ArrayList<String> arr,int[][] grid,int i, int j,int I,int J){
+        arr.add((i - I) + "," + (j - J));
+        grid[i][j]=2;
+        if(j<grid[0].length-1 && grid[i][j+1]==1){
+            check(arr,grid,i,j+1,I,J);
+        }
+        if(i<grid.length-1 && grid[i+1][j]==1){
+            check(arr,grid,i+1,j,I,J);
+        }
+        if(j>0 && grid[i][j-1]==1){
+            check(arr,grid,i,j-1,I,J);
+        }
+        if(i>0 && grid[i-1][j]==1){
+            check(arr,grid,i-1,j,I,J);
+        }
+    }
+}
+
+
+alien dictonary 
+
+
+import java.util.Set;
+import java.util.stream.Collectors;
+
+class Solution {
+    public String findOrder(String[] pr) {
+        if(pr.length==1){
+        Set<Character> charSet = pr[0].chars().mapToObj(c -> (char) c).collect(Collectors.toSet());
+            return charSet.stream().map(String::valueOf).collect(Collectors.joining());
+        }
+	     boolean[][] adj = new boolean [26][26];
+	     char[] res = new char[27];
+	     boolean[] vis = new boolean[26];
+	     boolean chr = true;
+	     res[26] = 'a';
+        int n=0;
+        
+        for (int i = 0; i < pr.length-1; i++) {
+            if(pr[i].length()>pr[i+1].length())
+            n= pr[i].length();
+            else
+            n= pr[i+1].length();
+            chr=true;
+            if (pr[i].length() > pr[i+1].length() && pr[i].startsWith(pr[i+1])) return "";
+            for(int j=0 ; j < n;j++){
+                //0,1     0,3    3,1     2,0  b,d,a,c
+                
+                if((j<pr[i].length() && j<pr[i+1].length() ) && (pr[i].charAt(j) != pr[i+1].charAt(j)) && chr){
+                    // System.out.println("i="+i+"j="+j+"||"+pr[i]+"||"+pr[i+1]);
+                    adj[pr[i+1].charAt(j)-'a'][pr[i].charAt(j)-'a'] = true;
+                    chr=false;
+                }
+       
+                if(j<pr[i].length())
+                vis[pr[i].charAt(j)-'a']=true;
+                if(j<pr[i+1].length())
+                vis[pr[i+1].charAt(j)-'a']=true;
+                
+            }
+        }
+        byte[] arr = new byte[26]; 
+        for (int i = 0; i < 26; i++) {
+            if (arr[i] == 0) {
+                //0,1     0,3    3,1     2,0
+                if(vis[i]){
+                if (!dfs(arr, adj, i, res)) {
+                    // System.out.println(Arrays.deepToString(adj));
+                    return "";
+                }
+                }
+            }
+        }
+        // System.out.println(Arrays.deepToString(adj));
+        return new String(res, 0, res[26]-'a');
+	}
+	  public static boolean dfs(byte[] arr, boolean[][] adj, int i, char[] res) {
+        if (arr[i] != 0) {
+            return arr[i] == 2;
+        }
+        arr[i] = 1; 
+        for (int j = 0; j < 26; j++) {
+            if(adj[i][j]){
+            if (!dfs(arr, adj, j,res)) {
+                return false; 
+            }
+            }
+        }
+        arr[i] = 2; 
+        res[res[26]-'a']= (char)('a'+i);
+        res[26]++;
+        // System.out.println("arr"+Arrays.toString(arr));
+        // System.out.println("res"+Arrays.toString(res));
+        // System.out.println("__________________________");
+        return true;
+    }
+}
+
+
+Shortest path in Directed Acyclic Graph
+
+
+// User function Template for Java
+import java.util.*;
+
+import java.util.Arrays;
+class Solution {
+
+  	public int[] shortestPath(int V, int E, int[][] e) {
+        int[] res = new int[V];
+        Arrays.fill(res, 999999);
+        res[0]=0;
+        Map<Integer,List<List<Integer>>> arr = new HashMap<>();
+        for(int i=0;i<E;i++){
+            if(arr.containsKey(e[i][0])){
+                List<List<Integer>> lis = arr.get(e[i][0]);
+                List<Integer> dir = new ArrayList<>();
+                dir.add(e[i][1]);
+                dir.add(e[i][2]);
+                lis.add(dir);
+            }
+            else{
+                List<List<Integer>> lis = new ArrayList<>();
+                List<Integer> dir = new ArrayList<>();
+                dir.add(e[i][1]);
+                dir.add(e[i][2]);
+                lis.add(dir);
+                arr.put(e[i][0],lis);
+            }
+        }
+        for(int i=0;i<V;i++){
+            dfs(arr,res,i);
+            
+        }
+        for(int i=0;i<V;i++){
+            if(res[i]==999999)
+            res[i]=-1;
+            
+        }
+        // System.out.println(Arrays.toString(res));
+
+        return res;
+    }
+    public void dfs(Map<Integer,List<List<Integer>>> arr,int[] res,int i){
+        
+        if(arr.get(i)==null)
+        return;
+        for( List<Integer> arr1 : arr.get(i)){
+            //  System.out.println(res[i]+arr1.get(1)+"   "+res[arr1.get(0)]);
+            // System.out.println(res[i]+arr1.get(1) <res[arr1.get(0)]);
+            if( (res[i]+arr1.get(1) <res[arr1.get(0)])){
+                res[arr1.get(0)]=res[i]+arr1.get(1);
+                // System.out.println("[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]");
+                // System.out.println(Arrays.toString(res)+" "+i);
+                // System.out.println(arr1);
+                // System.out.println("_________________________");
+                dfs(arr,res,arr1.get(0));
+            }
+        }
+        
+    }
+}
+
+Shortest path in Directed Acyclic Graph [ most efficient solution ]
+
+import java.util.*;
+
+class Solution {
+    // Custom Pair class is much faster and uses less memory than nested Lists/Maps
+    static class Pair {
+        int node;
+        int weight;
+        Pair(int node, int weight) {
+            this.node = node;
+            this.weight = weight;
+        }
+    }
+
+    public int[] shortestPath(int N, int M, int[][] edges) {
+        // 1. Build the Adjacency List
+        ArrayList<ArrayList<Pair>> adj = new ArrayList<>();
+        for (int i = 0; i < N; i++) {
+            adj.add(new ArrayList<Pair>());
+        }
+        for (int i = 0; i < M; i++) {
+            int u = edges[i][0];
+            int v = edges[i][1];
+            int wt = edges[i][2];
+            adj.get(u).add(new Pair(v, wt));
+        }
+
+        // 2. Find Topological Sort using DFS
+        boolean[] vis = new boolean[N];
+        Stack<Integer> st = new Stack<>();
+        for (int i = 0; i < N; i++) {
+            if (!vis[i]) {
+                topoSort(i, adj, vis, st);
+            }
+        }
+
+        // 3. Relax edges in Topological Order
+        int[] dist = new int[N];
+        // Using 1e9 instead of Integer.MAX_VALUE prevents integer overflow bugs
+        Arrays.fill(dist, (int)(1e9)); 
+        
+        int source = 0; // Assuming source node is 0
+        dist[source] = 0;
+        System.out.println(adj);
+        System.out.println(st);
+        while (!st.isEmpty()) {
+            int node = st.pop();
+            // System.out.println(Arrays.toString(dist));
+            // If the node has been reached from the source
+            if (dist[node] != (int)(1e9)) {
+                for (Pair edge : adj.get(node)) {
+                    if (dist[node] + edge.weight < dist[edge.node]) {
+                        dist[edge.node] = dist[node] + edge.weight;
+                    }
+                }
+            }
+        }
+
+        // 4. Convert unreachable nodes to -1
+        for (int i = 0; i < N; i++) {
+            if (dist[i] == (int)(1e9)) {
+                dist[i] = -1;
+            }
+        }
+        return dist;
+    }
+
+    private void topoSort(int node, ArrayList<ArrayList<Pair>> adj, boolean[] vis, Stack<Integer> st) {
+        vis[node] = true;
+        for (Pair edge : adj.get(node)) {
+            if (!vis[edge.node]) {
+                topoSort(edge.node, adj, vis, st);
+            }
+        }
+        st.push(node);
+    }
+}
+
+
+Minimum Multiplications to reach End
+
+import java.util.*;
+
+class Solution {
+    
+    // Custom Pair Class is safely nested inside Solution
+    class Pair<K, V> {
+        private K key;
+        private V value;
+
+        public Pair(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public K getKey() { return key; }
+        public V getValue() { return value; }
+    }
+    
+    public int minimumMultiplications(int[] arr, int start, int end) {
+        // Edge case: if start and end are the same, 0 steps needed.
+        if (start == end) return 0; 
+        
+        Queue<Pair<Integer, Integer>> q = new LinkedList<>();
+        int[] vis = new int[100000]; // Array size must be 100000
+        Arrays.fill(vis, Integer.MAX_VALUE);
+        
+        // Add the start node using the correct variable name
+        q.add(new Pair<>(start, 0)); 
+        vis[start] = 0;
+        
+        // Run the BFS
+        bfs(q, vis, arr, start, end);
+        
+        // Return the result
+        if (vis[end] == Integer.MAX_VALUE) {
+            return -1;
+        } else {
+            return vis[end];
+        }
+    } 
+    
+    // The bfs method is now properly INSIDE the Solution class
+    public void bfs(Queue<Pair<Integer, Integer>> q, int[] vis, int[] arr, int s, int e) {
+        
+        while (!q.isEmpty()) {
+            Pair<Integer, Integer> curr = q.poll();
+            int node = curr.getKey();
+            int steps = curr.getValue();
+            
+            // If we reached the target, stop processing this branch
+            if (node == e) continue; 
+            
+            for (int i = 0; i < arr.length; i++) {
+                // Calculate the next number using modulo 100000
+                int nextNode = (node * arr[i]) % 100000;
+                int nextSteps = steps + 1;
+                
+                // If we found a faster way to reach nextNode, add it to queue
+                if (nextSteps < vis[nextNode]) {
+                    vis[nextNode] = nextSteps;
+                    q.add(new Pair<>(nextNode, nextSteps));
+                }
+            }
+        }
+    }
+} // The entire Solution class ends here
+
+
+
+island 2 problem [ online input ]
+
+import java.util.HashSet;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+public class Solution {
+    public static int[] numberOfIslandII(int n, int m, int [][]queries, int q) {
+        int[] arr = new int[m*n];
+        int[] res = new int[q];
+        int[][] ear = new int[n][m];
+        int I=0;
+        // for(int i=0;i<m*n;i++){
+        //     arr[i]=i;
+        // }
+        for(int i=0;i<q;i++){
+            ear[queries[i][0]][queries[i][1]]=i+1;
+            
+            int x=queries[i][0],y=queries[i][1];
+            change(ear,arr,i+1,x,y);
+            HashSet<Integer> set = Arrays.stream(arr)
+                             .boxed()
+                             .collect(Collectors.toCollection(HashSet::new));
+            res[I++]=set.size()-1;
+            if(res[I-1]==0)
+            res[I-1]=1;
+            // System.out.print("x "+x+" y "+y);
+            // System.out.println(Arrays.toString(arr));
+        }
+        
+        return res;
+    }
+    public static void change(int[][] arr,int[] f,int x,int i,int j){
+            arr[i][j]=x;
+            f[(i*arr[0].length)+j]=x;
+           if(i>0 && arr[i-1][j]!=0 && arr[i-1][j]!=x){
+               change(arr,f,x,i-1,j);
+           } 
+           if(j>0 && arr[i][j-1]!=0 && arr[i][j-1]!=x){
+               change(arr,f,x,i,j-1);
+           } 
+           if(i<arr.length-1 && arr[i+1][j]!=0 && arr[i+1][j]!=x){
+               change(arr,f,x,i+1,j);
+           } 
+           if(j<arr[0].length-1 && arr[i][j+1]!=0 && arr[i][j+1]!=x){
+               change(arr,f,x,i,j+1);
+           } 
+        
+    }
+}

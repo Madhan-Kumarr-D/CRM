@@ -1,0 +1,391 @@
+Diagram 1 — the request path from client through CDN, WAF, rate limiter, API gateway, and into the three independent service namespaces. Every inbound request is split at the gateway before it ever reaches application code.
+Diagram 2 — the Read Service's three-layer cache lookup: Caffeine L1 in the pod's own memory (sub-millisecond), Redis cluster L2 (under 2ms), then fan-out to Cassandra for records, Postgres read replicas for module/field schema, and Elasticsearch for search. A 90% Redis hit rate means only 116K of your 1.16M RPS actually reaches Cassandra.
+Diagram 3 — the Write Service's single responsibility: write to Postgres primary and return an ID. Debezium reads the WAL and fans out to five independent consumer groups — ES Sink, Cache Invalidator, Audit Logger, Analytics Sink, and Notifier — all asynchronously and with zero coupling to the write path. The outbox pattern and idempotency key ensure exactly-once delivery even across restarts.
+Diagram 4 — the User Service (completely isolated project and database), the observability stack (Prometheus scraping every pod's /actuator/prometheus, Grafana dashboards, Jaeger traces, ELK logs), and the full Kubernetes deployment detail: namespaces, HPA for read/write, KEDA for Kafka consumers, PodDisruptionBudgets, network policies, VPA, ArgoCD GitOps, Vault secret injection, and Helm charts.
+Diagram 5 — the CI/CD pipeline (Git push → GitHub Actions → Docker build → ECR → Helm values update → ArgoCD sync → rolling deploy with Istio canary at 5% before full promotion), plus the summary table with traffic volumes, pod counts, primary databases, and the three invariants that must never be broken: the Read Service never writes, the Write Service returns IDs only, and no two services share a database.
+
+
+
+
+
+
+
+This is a serious architecture challenge. Let me build a comprehensive visual first, then walk through every layer.Now let me walk through every layer in detail.
+
+---
+
+## The core architectural decision: CQRS at 1B reads
+
+At this scale the read/write asymmetry is 100:1. The single biggest decision is splitting read and write services into completely separate deployable units backed by different databases. Reads hit Cassandra + Redis; writes go to Postgres primary and emit CDC events. This is the load-bearing choice everything else is built around.
+
+---
+
+## Layer-by-layer breakdown
+
+### Edge layer
+
+Traffic never reaches your services raw. CloudFront (or Cloudflare) absorbs static content and caches module/field schema responses at the CDN edge — those barely change and can have a 1-minute TTL globally. A WAF in front drops malformed requests before they cost you compute. A Redis-backed token-bucket rate limiter sits at the gateway level so no single tenant can flood the system.
+
+### API Gateway (Kong or AWS API Gateway)
+
+This does three jobs: JWT verification against a public key from your User Service, routing to the correct backend pod pool, and — critically — the read/write split. Every `GET` goes to the read pod pool; every `POST`, `PUT`, `DELETE` goes to the write pod pool. This routing happens at the gateway level so your services never need to care.
+
+### Service split: Read vs Write
+
+**Read service** (scale to 10 pods): stateless, no DB writes, reads from Cassandra for records and Postgres read replicas for modules/fields. Result is cached in Redis with a 15-minute TTL. One billion reads per day is about 11,500 RPS — 10 pods with Cassandra and a hot Redis cache handles this comfortably.
+
+**Write service** (3 pods is enough): 10 million writes/day is ~115 RPS. This writes to Postgres primary only, then immediately returns. It does not update Elasticsearch or invalidate caches directly — that is Kafka's job.
+
+**User service**: completely isolated project, separate DB, JWT issuer. Your existing design is correct. At 100K req/day it needs only 2 pods.
+
+### Cassandra for records
+
+Records are the only entity with 1B+ rows. Cassandra is purpose-built for this:
+
+```
+CREATE TABLE records (
+  module_api   TEXT,
+  created_date DATE,
+  record_id    UUID,
+  data         MAP<TEXT, TEXT>,
+  PRIMARY KEY ((module_api, created_date), record_id)
+) WITH CLUSTERING ORDER BY (record_id ASC)
+  AND default_time_to_live = 63072000;
+```
+
+Partition key is `(module_api, created_date)` so queries are always bounded by module and time range. Never do a full-table scan. Replication factor 3 across 3 availability zones. Use `QUORUM` for writes and `LOCAL_QUORUM` for reads.
+
+Modules and Fields stay in Postgres — they are metadata (thousands of rows, not billions) and benefit from relational integrity.
+
+### Kafka + Debezium CDC pipeline
+
+This is the heart of the async architecture. Debezium connects to Postgres's WAL (Write-Ahead Log) and emits a Kafka event for every insert/update/delete at the row level — before your application code even finishes. Three separate topics: `records.cdc`, `modules.cdc`, `fields.cdc`.
+
+Four consumer groups read these topics independently:
+
+1. **ES Sink** (via Kafka Connect Elasticsearch connector) — pushes every record change into Elasticsearch. This is how your billion records stay searchable without the write service touching ES directly.
+2. **Cache Invalidator** — listens to changes, evicts the relevant Redis keys. This is how cache coherence works without polling.
+3. **Audit Logger** — writes every mutation to an immutable audit table.
+4. **Analytics Sink** — streams into ClickHouse for dashboards and aggregate queries.
+
+The key insight: your write service writes to Postgres once. Everything else — cache, search, analytics, audit — happens downstream via Kafka, with zero coupling to the write path.
+
+### Elasticsearch
+
+Fed exclusively by the Kafka Connect ES Sink connector. Your search service is a thin proxy that validates the query and calls ES:
+
+```java
+@GetMapping("/search/{moduleApi}")
+public SearchResponse search(
+    @PathVariable String moduleApi,
+    @RequestParam String q,
+    @RequestParam(defaultValue = "0") int from,
+    @RequestParam(defaultValue = "20") int size) {
+    // Build ES query with module filter + full-text match
+    return esClient.search(moduleApi, q, from, size);
+}
+```
+
+Index per module (`records_contacts`, `records_deals`, etc.) so you can tune mappings and shard counts per module. Use `keyword` type for filterable fields and `text` with an analyzer for full-text search fields.
+
+### Redis caching strategy
+
+Three TTL tiers:
+- Module schema: 30 minutes (changes rarely)
+- Field definitions per module: 30 minutes
+- Record lists by module+page: 5 minutes
+- Individual record by ID: 15 minutes
+
+Cache keys follow the pattern `record:{moduleApi}:{recordId}` and `records:{moduleApi}:{page}:{pageSize}`. The Kafka Cache Invalidator consumer uses this same key format to evict on mutation.
+
+---
+
+## Kubernetes + Docker implementation
+
+### Dockerfile (read service as example)
+
+```dockerfile
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY target/crm-read-service.jar app.jar
+RUN addgroup -S crm && adduser -S crm -G crm
+USER crm
+EXPOSE 8080
+ENTRYPOINT ["java", "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+```
+
+### Kubernetes deployment (read service)
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crm-read-service
+  namespace: crm-read
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: crm-read
+  template:
+    spec:
+      containers:
+      - name: crm-read
+        image: your-registry/crm-read:1.0.0
+        resources:
+          requests: { cpu: "500m", memory: "512Mi" }
+          limits:   { cpu: "2",    memory: "2Gi"  }
+        readinessProbe:
+          httpGet: { path: /actuator/health/readiness, port: 8080 }
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: { path: /actuator/health/liveness, port: 8080 }
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        env:
+        - name: CASSANDRA_CONTACT_POINTS
+          valueFrom:
+            secretKeyRef: { name: cassandra-secret, key: hosts }
+```
+
+### HPA (auto-scales read pods from 5 to 20)
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: crm-read-hpa
+  namespace: crm-read
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: crm-read-service
+  minReplicas: 5
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+```
+
+For the Kafka consumer pods, use KEDA instead of HPA — it scales based on consumer group lag, which is a far better signal than CPU for event-driven workloads.
+
+### Namespace structure
+
+```
+crm-read/       # Read service pods, 5–20 replicas
+crm-write/      # Write service pods, 3–6 replicas
+user-svc/       # User service, 2 replicas
+infra/          # Redis, monitoring exporters
+kafka/          # Kafka + Debezium + Connect (or managed MSK/Confluent)
+elastic/        # Elasticsearch (or managed)
+```
+
+### GitOps with ArgoCD
+
+Every merge to `main` triggers a GitHub Actions pipeline: build → test → Docker push → update Helm `values.yaml` with the new image tag → ArgoCD detects the Git change and syncs the cluster automatically. No `kubectl apply` in CI pipelines.
+
+---
+
+## Additional concepts worth adopting
+
+**Outbox pattern**: Instead of writing directly to Postgres and hoping Debezium catches it, write to an `outbox` table in the same transaction as your business record. A separate poller picks up outbox rows and publishes them to Kafka. This gives you exactly-once guarantees during Postgres restarts.
+
+**Istio service mesh**: Handles mTLS between all pods automatically, gives you circuit breakers (if the write service is slow, reads fail fast instead of backing up), and lets you do canary deployments by routing 5% of traffic to a new version before full rollout.
+
+**ClickHouse for analytics**: Cassandra is terrible for aggregate queries ("how many deals closed this month across all tenants"). ClickHouse receives a copy of every event via the Kafka analytics sink and handles these column-oriented aggregations in milliseconds over billions of rows.
+
+**VPA (Vertical Pod Autoscaler)**: HPA scales pod count; VPA adjusts the CPU/memory requests of each pod based on actual usage over time. Run it in recommendation mode first — it will tell you where your initial resource estimates are wrong before you let it make changes automatically.
+
+---
+
+## Migration path (don't do this all at once)
+
+1. Add Redis caching to your existing services — immediate win, no architecture change
+2. Add pagination to all list endpoints
+3. Extract User Service (you're already doing this)3
+4. Set up Postgres read replicas + route reads to them
+5. Introduce Kafka + Debezium CDC
+6. Migrate records table to Cassandra, keep modules/fields in Postgres
+7. Deploy Elasticsearch + Kafka Connect ES sink
+8. Containerise with Docker, deploy to Kubernetes
+9. Add Istio, KEDA, ArgoCD progressively
+
+Each step is independently deployable and delivers value before the next one begins.
+
+
+
+
+
+Great question — this changes things significantly. At **100B reads / 1B writes**, you're now in territory where the architecture decision is binary: **you must fully separate Read and Write into independent services with independent deployments, independent databases, and independent scaling.** Sharing anything between them at this scale creates a single point of failure.
+
+Let me break down exactly why, and what each tier needs.First, the direct answer to your question — then the two service blueprints side by side.Now here is the detailed blueprint for each of the three services.
+
+---
+
+## The numbers that force the decision
+
+100B reads/day = **~1.16 million RPS**. 1B writes/day = **~11,600 RPS**. Those are 100× different workloads. They have completely different resource profiles, different GC behaviour, different DB connection needs, different SLAs, and different failure modes. Sharing a JVM process for both is like routing a highway and a side street through the same single-lane road — the truck (writes) blocks the bicycle (reads) every time a GC pause fires.
+
+---
+
+## Read Service — blueprint
+
+This is the heaviest service. It needs to absorb 1.16M RPS with sub-10ms p99 latency.
+
+**What it does:** GET only. No Postgres writes. No Kafka. No mutations of any kind. Its only job is to return data fast.
+
+**Database stack, in order of lookup:**
+
+1. Redis cluster — local L1 cache in the pod's memory (`Caffeine`, 10k entries, 30s TTL) → Redis cluster L2 (15-min TTL). Cache hit rate target is 90%+. At 90% hit rate, only 116K RPS actually hit Cassandra.
+2. Cassandra — for record lookups (the 100B row dataset). Partition key is `(module_api, tenant_id)` with record_id as the clustering key. Always bounded queries, never full-table scans.
+3. Postgres read replicas — for module schema and field definitions only (thousands of rows, not billions — Postgres handles this perfectly). 3 read replicas with streaming replication from the write service's primary.
+4. Elasticsearch — for search queries only, routed from the Search endpoint specifically.
+
+**JVM tuning for read-heavy workload:**
+
+```yaml
+JAVA_OPTS: >
+  -XX:+UseZGC
+  -XX:MaxHeapSize=6g
+  -XX:+UseContainerSupport
+  -XX:MaxRAMPercentage=70
+  -XX:+OptimizeStringConcat
+  -Dspring.datasandra.request.timeout=500ms
+```
+
+ZGC is critical here — it keeps GC pauses under 1ms even at 6GB heap, which is what lets you hit sub-10ms p99 at 1M RPS.
+
+**Pod sizing and count:**
+
+```yaml
+resources:
+  requests: { cpu: "2", memory: "6Gi" }
+  limits:   { cpu: "4", memory: "8Gi" }
+minReplicas: 30
+maxReplicas: 80
+```
+
+**HPA target:** scale at 60% CPU. At 1.16M RPS divided across 30 pods, each pod handles ~39K RPS, which is achievable when 90% of requests are Redis hits (microsecond responses).
+
+**Key application code pattern:**
+
+```java
+@GetMapping("/records/{moduleApi}")
+public Mono<List<RecordDTO>> getRecords(
+    @PathVariable String moduleApi,
+    @RequestParam(defaultValue = "0") int page,
+    @RequestParam(defaultValue = "50") int size) {
+
+    String cacheKey = "records:" + moduleApi + ":" + page + ":" + size;
+
+    return Mono.fromCallable(() -> localCache.getIfPresent(cacheKey))
+        .switchIfEmpty(redisCache.get(cacheKey)
+            .switchIfEmpty(cassandraRepo
+                .findByModule(moduleApi, PageRequest.of(page, size))
+                .collectList()
+                .doOnNext(r -> redisCache.set(cacheKey, r, Duration.ofMinutes(15)))
+            )
+            .doOnNext(r -> localCache.put(cacheKey, r))
+        );
+}
+```
+
+Use reactive (`WebFlux` + `Mono`/`Flux`) not blocking Spring MVC. At 39K RPS per pod, blocking threads will exhaust your thread pool instantly. Reactive with virtual threads (Java 21) handles this with a tiny thread pool.
+
+---
+
+## Write Service — blueprint
+
+This is the simpler service. 11,600 RPS is very manageable. The complexity here is correctness and durability, not raw throughput.
+
+**What it does:** POST, PUT, DELETE only. Writes to Postgres primary. Emits nothing to Elasticsearch or Redis directly — all downstream propagation happens via the Kafka CDC pipeline.
+
+**Database stack:**
+
+Only one database: Postgres primary. One write path. No read replicas, no Cassandra, no Redis writes. The write service doesn't cache, doesn't search, doesn't read back what it wrote (except to validate existence before update/delete).
+
+The Debezium connector running alongside reads the Postgres WAL and fans out to:
+- Cassandra sync consumer (syncs records table)
+- Redis invalidation consumer (evicts stale cache keys)
+- Elasticsearch sink (via Kafka Connect ES connector)
+- Audit log consumer
+
+**The write path becomes extremely simple:**
+
+```java
+@PostMapping("/records/{moduleApi}")
+@Transactional
+public ResponseEntity<Map<String, Object>> createRecord(
+    @PathVariable String moduleApi,
+    @RequestBody Map<String, String> data) {
+
+    validateModuleExists(moduleApi);  // cache-backed check, not a full DB hit
+    Record saved = recordRepository.save(
+        Record.builder()
+            .moduleApi(moduleApi)
+            .tenantId(tenantContext.getTenantId())
+            .data(data)
+            .createdAt(Instant.now())
+            .build()
+    );
+    // Debezium picks up the WAL change — nothing else to do here
+    return ResponseEntity.status(201).body(Map.of("id", saved.getId()));
+}
+```
+
+No manual Kafka produce calls. No manual cache invalidation. No Elasticsearch updates. Debezium handles all of it asynchronously. This keeps the write path clean, fast, and easy to reason about.
+
+**Pod sizing:**
+
+```yaml
+resources:
+  requests: { cpu: "1", memory: "2Gi" }
+  limits:   { cpu: "2", memory: "4Gi" }
+minReplicas: 5
+maxReplicas: 15
+```
+
+**Postgres connection pool:** Hikari with `maximumPoolSize=20` per pod. 5 pods × 20 = 100 connections to primary. Postgres comfortably handles 200 connections, so this gives you headroom.
+
+---
+
+## User Service — blueprint
+
+1M CRUD/day = ~12 RPS. This is tiny. But it deserves its own service because it holds authentication and tenant identity — a bug here affects everything.
+
+**Stack:** Spring Boot + Postgres (its own dedicated instance, not shared with the CRM). JWT RS256 for token issuance. Redis for token blacklist (logout/revoke). BCrypt for password hashing.
+
+**Why Postgres and not Cassandra here:** User records have complex relational constraints — tenant membership, role assignments, permission tables. These are hundreds of thousands of rows, not billions. Postgres handles this with zero issues. Cassandra would add operational complexity for zero benefit at this data volume.
+
+**Pod sizing:**
+
+```yaml
+resources:
+  requests: { cpu: "250m", memory: "512Mi" }
+  limits:   { cpu: "1", memory: "1Gi" }
+minReplicas: 2
+maxReplicas: 6
+```
+
+Two pods is enough for 12 RPS with 99.99% uptime if you have a `PodDisruptionBudget` of `minAvailable: 1`.
+
+---
+
+## The critical architectural invariant
+
+The Read Service must never write. The Write Service must never read beyond what's needed for input validation. If you find yourself adding a read-back inside the write path ("after saving, fetch the full record to return it to the client"), that is the wrong pattern at this scale — instead return only the ID from writes and let the client fetch via the read service if it needs the full object. This keeps the write path at sub-millisecond DB time and prevents write traffic from ever touching the read path's data tier.
+
+This is the one architectural rule that, if broken, collapses back to all the problems shown in the left side of the diagram above.

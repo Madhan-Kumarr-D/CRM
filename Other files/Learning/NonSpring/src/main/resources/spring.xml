@@ -1,0 +1,31 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:mvc="http://www.springframework.org/schema/mvc"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="
+        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/mvc http://www.springframework.org/schema/mvc/spring-mvc.xsd
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+
+    <!-- enable Spring MVC annotations -->
+    <mvc:annotation-driven/>
+    <context:component-scan base-package="org.example.controller"/>
+
+    <!-- bean definitions here -->
+    <bean id="dev" class="org.example.Dev" >
+        <!--        <property name="lap" ref="lap"/>-->
+        <constructor-arg ref="lap"/>
+
+    </bean>
+    <bean id="lap" class="org.example.Lap" >
+        <constructor-arg value="78"/>
+    </bean>
+<!--    <bean id="itemservice" class="org.example.service.ItemService"/>-->
+<!--    <bean id="itemcontroller" class="org.example.controller.ItemController">-->
+<!--        <constructor-arg ref="itemservice"/>-->
+<!--    </bean>-->
+
+    <bean id="itemBean" class="org.example.model.Item"/>
+
+
+</beans>

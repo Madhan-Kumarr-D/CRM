@@ -1,0 +1,197 @@
+Field injection
+
+object declared with auto wired anotation but the variable works as there is an object created.
+
+but the constructor injection and setter injusction were preferred over field injection.
+
+If you have interface, declaring object for interface alone will be good and it will take care of injecting the bean.
+
+if two classes implements an interface and overiding the same function you need to use @primary or @Qualifier("class name with small letter") anotation on the class you think it is primary
+
+priority1 - primary
+priority2 - qualifier
+priority3 - component
+
+property tag - do getter [ setter ] job
+
+bean tag - do constructor (default trigger)
+
+constructor arg tag - do parameterized constructotr job
+
+In bean tag we can put autowiring = Byname [ that means the when we declare a object just reference [ the spring will search for the name of the object in the spring.xml [ id of bean tages and connect two]
+
+In bean tag we can put autowiring = Bytype [ that means the when we declare a object just reference [ the spring will search for the type of the object in the spring.xml [ id of bean tages and connect two]
+
+auto wriring is done replacing the property tag
+
+property tag is done  to replace setter method
+
+autowiring only done for setter of a object that is inside other object
+
+injections
+
+constructor injuction - > [class1 have some variables] and [class 2 will have object reference of class1 and will have a constructor of class2 that gets class1 object as param and sets the same object to the referce and you also declare qualifier as primary and secondary] also you can use @Autowire to the above of the constructor.
+
+field injuction -> using autowired annotation at top of any object refence.
+
+method injection -> you will have a method on top of it mentioned as autowired, within the method there will be few object refernces were declared.
+
+setter injection -> a setter fucntion will be anotated and autowired on top of it and the setter function will set the objt to a refernce.
+
+bean scopes:
+
+singletone bean scope - Regardless of how many times a bean with singleton scope is requested, only one instance of that bean is ever created within the Spring application context.
+
+prototype bean scope - The prototype bean scope in Spring creates a new instance of a bean every time it is requested from the container. This means each component that requests a prototype-scoped bean receives a unique object with its own state, unlike the default singleton scope where one shared instance is used throughout the application.
+
+request bean scope - In Spring, a request-scoped bean is an instance of a bean that is created and managed for the duration of a single HTTP request in a web application.
+
+session bean scope - A session-scoped bean in a web application framework like Spring is an object whose lifecycle is tied to a user's HTTP session.
+
+application bean scope - in Spring is specific to web applications and means a single instance of a bean is created and maintained for the entire duration of the web application's ServletContext. This is similar to the singleton scope but tied to the web context.
+
+websocket bean scope - The WebSocket bean scope in Spring creates a new instance of a bean for each individual WebSocket session. This means that every time a new client establishes a WebSocket connection with the server, Spring instantiates a fresh copy of the WebSocket-scoped bean, specifically for that connection.
+
+@profile("cloud") - is used to restrict a class to a certain environment.
+
+@PropertySource("classpath:database.properties") - on top of the class and use @Value("${jdbc.url}") private string url; use @Value("${jdbc.username}") private string username;use @Value("${jdbc.password}") private string password;
+values will be injected from the apploication.properties file 
+
+for the api calls made the values passed in the APi URl were get by using the @pathvariable mapping and the payload will be get by @bodyparam mapping
+
+In the repository layer 
+
+ @Autowired
+    private DataSource dataSource;
+
+public Connection getConnection() throws SQLException {
+        // Now it uses your application.properties settings!
+        return dataSource.getConnection();
+    }
+
+
+were mandatory and we should createstatement() and executeupdate() for get queries [that donot take inputs] , preparestatement() and executeupdate() for [ that take inputs]
+
+Usually table names and tble columns were often concatinated with the query but the values were first insterted with the ? then the ? will be replaced with the actual value.
+
+
+
+microservices
+
+when more than one database runs, we need euraka server inbetween the databases, as all the database and the instances will be registering them selves in the eureka server and when a DB need data from another DB it will do service discovery call in the eureka server
+
+
+eureka client code should be declared on pom file
+
+to access db1 from db2, db2 should have feign client, in db 2 there should be a interface where you should be declaring the functions of the apis from the db1. and by accessing the variable you cal directly call the function in db1 from db2 
+
+feign client :
+
+declare a interface in the project annotate with the enable feigh client tag to it, then declare all the functions the you need to use from the another miscroservice
+
+then use the interface variable and call the functtion in the DB 2 and use the functions as if they were in this own DB.
+
+important is that the fiegn client should be enabled from the application properties fiels as well.
+
+Api gatway:
+
+when a api is called the load balancing will be done on default, but when a single call is authenticated then api gateway allows the same user to access any microservices and any instance of the api without any issue.
+
+a new spring must be downloaded with the api gate way [ pow file api gate way]
+
+and the respective service should enable the api gate way in application.properties file.
+
+
+the api call should include the api service in the the api URL, every api call will search the service in the service registory, and then distributes the api call accross the service's multiple instances with respect to the busy ness of the api.
+
+kafka:
+
+it is a concept used for the resolving the problems between the micoservices tightly compling [ when a service a is calling service b and service b is down for some moment then the service a will not get the response and the rest call would be stuck in a stale mate ]
+
+for resolving this problem a queue struture was made and calls and the communications between the two services will be independent of other services basically all the microservices will be communicating with each other in a independent manner.
+
+the service A will produce an api call [ producer ] and the api call will be received by the service B [ consumer ] this whole kafca works in a producer consumer processes. 
+
+there will be a kafka broker inside that we can have multiple topics and each topic can have multiple partitions inside it
+
+important one partition cannot be shared over the two consumers of the same group [ two consumers can access the same pertition when these consumers were from different group ]
+
+one consumer can access two partitions at same time.
+
+the producer can give the partition key [ as which partition should be assisgned with the produced data ]
+
+there were consumer groups [ few similar consumers wrapped together ]
+
+few kafka brokers were grouped together to form a cluster.
+
+kafka follows leader and follower scheme to tackle fault tolaranace, one partition in kafka broker will be a leader in kafka broker 1, there will be another two partitions in other two kafka brokers that are followers of this leader, the producer will send data to the leader and the data will be syned from the leader to the followers
+
+zookeeper is like a complete manager, it stores the broker, partitiona and the cluster informtations of the kafka and it decides who should be the leader and who should be the follower, and also it decides and controls the leader election of the kafka.
+
+implementation:
+
+go to kafka.apache.org -> scroll to stable version -> click tgz file
+
+inside the folder there is a bin folder -> all file here will be for linux [ go to windows folder ]-> these are files for windows working
+
+From the main folder-> config -> copy [ server, zookeeper] (property source files)s
+
+zookeeper port - 2181  ->[ server.propertiesfile] broker.id =0 [ means it is the first broker] port - 9092 [server] and num.partition=1 [ it can be increased]
+
+for running kafka -> main folder -> bin folder -> kafka-server-start and zookeper-server-start
+
+running:
+
+cmd-> run as administrator-> cd kafkafolder/bin/windows -> zookeeper-server-start.bat zookeeper.properties
+
+cmd-> run as administrator-> cd kafkafolder/bin/windows -> kafka-server-start.bat server.properties
+
+wimc is not recognized error for running server
+
+inside kafka-server-start.bat file -> if(kafka heap opts) remove all the lines in the componenet except the last line and save
+
+for more number of serversclone the server.properties file and change broker.id = increase and port number increase
+
+log.dirs -> kafka-logs -> kafka-logs2[name should eb changed]
+
+for running topics
+
+cmd-> run as administrator-> cd kafkafolder/bin/windows ->kafka-topic.bat --create --topic topicName --bootstrap-server localhost:9092 --partition 4 --replication-factor 2 [ replication factor is the number of kafka brokers are currently running ]
+
+testing how many topics created command
+
+kafka-topics.bat --describe --topic topicname --bootstrap-server localhost:9092
+
+listing kafka topics
+
+kafka-topics.bat --list --bootstrap-server localhost:9092
+
+download spring initializer with [ spring web, spring boot devtools, Spring for apache kafka ]
+
+should create kafka model,service, controller [ kafka template should be used for sending data]
+
+kafkaTemplateVariable.send(topic name, key, object); from the service layer[this call will be routed from the controller]
+
+open application.yaml file -> define server port, define kafka port, keyserializer, value serializer
+
+now the producer application was completed now its time to create consumer application
+
+copy and clone the procducer application and name ir consumer
+
+In the service layer of consumer
+
+@kafkaListener(topics="topic name" , groupId = "consumer group name") // the below function's input params will subscribe the data.
+
+open application.yaml file -> define server port, define kafka port, consumer gruop ID,  key- deserializer, value deserializer, also declare a specific package from which the data should be consumed.
+
+SQL and Java conneting Code
+
+if the statement can cause error or execpetion it should be inside the try block, first connection creation block should be inside the try block
+it should have a normal atch and error throw block, entire code inside should be enclosed with a dummy try block before this try block autocommit should be set to false, the repective catch block should contian a roll back and it should throw exception as well and immmediatly after this a finally block should set the auto commit value to true, all the other try blocks inside will not thogh error but by checking the responses from the updation for the data base using if throws expection it will also be captured in the outside common catch block.
+Important all the checking regular expresions and [ module api name , field api name were lookuped and checked if the api nams sent from the user were legit and this entire checking were conducted entirely on the serice layer of the architecture. 
+
+output of the sql updation in java
+
+for DML queries the number of rows get affected will be returned as output.
+
+for DDL queries 0 will be returned as output.

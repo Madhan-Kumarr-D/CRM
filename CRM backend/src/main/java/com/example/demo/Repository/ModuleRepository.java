@@ -59,7 +59,7 @@ public class ModuleRepository {
        Date CreatedDate = rs.getDate("CreatedDate");
        return new Module(ModuleName,ModuleID,ApiName,CreatedDate);
    }
-    private Field mapRowField(ResultSet rs) throws SQLException {
+   private Field mapRowField(ResultSet rs) throws SQLException {
         String FieldApiName = rs.getString("FieldApiName");
         String FieldDisplayName = rs.getString("FieldDisplayName");
         String FieldDataType = rs.getString("FieldDataType");
@@ -84,62 +84,92 @@ public  List<Module> getModules(){
 }
 public Module createModule(Module modulePayload) throws SQLException {
        String insertQuery = "INSERT Module (ModuleName,ApiName,CreatedDate) VALUES (?,?,?)";
+       String outboxQuery = "INSERT INTO outbox (aggregate, event_type, payload) VALUES (?, ?, ?)";
        String apiname = modulePayload.getApiName();
     if (!apiname.matches("^[a-zA-Z0-9_]{1,20}$")) {
         System.out.println("Invalid API Name detected: " + apiname);
         return null;
     }
-    String CreateTableQuery = "CREATE TABLE "+modulePayload.getApiName()+" (   FieldID BIGINT NOT NULL IDENTITY(1,1) PRIMARY KEY, FieldApiName VARCHAR(20) NOT NULL,  FieldDisplayName VARCHAR(20) NOT NULL,  FieldDataType VARCHAR(20) NOT NULL ) ";
-    String InsertFirstRow = "INSERT INTO "+modulePayload.getApiName()+" ( FieldApiName , FieldDisplayName , FieldDataType) VALUES ( 'Name' , 'Name' , 'String' ) ";
-    String InsertSecondRow = "INSERT INTO "+modulePayload.getApiName()+" ( FieldApiName , FieldDisplayName , FieldDataType) VALUES ( 'Number' , 'Number' , 'Number' ) ";
-    String CreateRecordQuery = "CREATE TABLE "+modulePayload.getApiName()+"records  ( RecordID BIGINT NOT NULL IDENTITY(1,1) PRIMARY KEY, Name VARCHAR(20) NOT NULL , Number BIGINT)";
     System.out.println(modulePayload);
        try (Connection con = getConnection()){
            con.setAutoCommit(false);
+           try
+           {
+               try (PreparedStatement pstmt = con.prepareStatement(outboxQuery)) {
+                   pstmt.setString(1, "MODULE");
+                   pstmt.setString(2, "CREATE");
+                   StringBuilder Builder = new StringBuilder(64);
+                   Builder.append("{\"moduleName\":\"").append(modulePayload.getModuleName())
+                           .append("\",\"apiName\":\"").append(apiname).append("\"}");
+                   pstmt.setString(3, Builder.toString());
+                   if (pstmt.executeUpdate() <= 0) {
 
-           try (PreparedStatement pst = con.prepareStatement(insertQuery,Statement.RETURN_GENERATED_KEYS);){
-               pst.setString(1,modulePayload.getModuleName());
-               pst.setString(2,modulePayload.getApiName());
-               java.time.LocalDate today = java.time.LocalDate.now();
-               pst.setDate(3,java.sql.Date.valueOf(today));
-               System.out.println(pst);
-               if (pst.executeUpdate() > 0){
-                   try (ResultSet rs = pst.getGeneratedKeys()){
-                       if (rs.next()){
-                           long generatedID = rs.getLong(1);
-                           modulePayload.setRecordID(generatedID);
-                       }
+                       throw new SQLException();
                    }
-                   try (Statement st = con.createStatement()){
-                       st.executeUpdate(CreateTableQuery);
-                       st.executeUpdate(InsertFirstRow);
-                       st.executeUpdate(InsertSecondRow);
-                       st.executeUpdate(CreateRecordQuery);
-                       con.commit();
-                       System.out.println("updation completed");
-                       return modulePayload;
-                   }catch (Exception e){
-                       con.rollback();
-                       System.out.println(e);
-                   }
-
                }
-               else {
-                   con.rollback();
-                   System.out.println("rolled back");
+//               catch (SQLException e) {
+//                   con.rollback();
+//                   throw new RuntimeException(e);
+//               }
+               try (PreparedStatement pst = con.prepareStatement(insertQuery, Statement.RETURN_GENERATED_KEYS);) {
+                   pst.setString(1, modulePayload.getModuleName());
+                   pst.setString(2, modulePayload.getApiName());
+                   pst.setDate(3, new java.sql.Date(System.currentTimeMillis()));
+                   System.out.println(pst);
+                   if (pst.executeUpdate() > 0) {
+                       try (ResultSet rs = pst.getGeneratedKeys()) {
+                           if (rs.next()) {
+                               long generatedID = rs.getLong(1);
+                               modulePayload.setRecordID(generatedID);
+                           }
+                       }
+                       String CreateTableQuery = "CREATE TABLE " + modulePayload.getApiName() + " (   FieldID BIGINT NOT NULL IDENTITY(1,1) PRIMARY KEY, FieldApiName VARCHAR(20) NOT NULL,  FieldDisplayName VARCHAR(20) NOT NULL,  FieldDataType VARCHAR(20) NOT NULL ) ";
+                       String InsertFirstRow = "INSERT INTO " + modulePayload.getApiName() + " ( FieldApiName , FieldDisplayName , FieldDataType) VALUES ( 'Name' , 'Name' , 'String' ) ";
+                       String InsertSecondRow = "INSERT INTO " + modulePayload.getApiName() + " ( FieldApiName , FieldDisplayName , FieldDataType) VALUES ( 'Number' , 'Number' , 'Number' ) ";
+                       String CreateRecordQuery = "CREATE TABLE " + modulePayload.getApiName() + "records  ( RecordID BIGINT NOT NULL IDENTITY(1,1) PRIMARY KEY, Name VARCHAR(20) NOT NULL , Number BIGINT)";
+
+                       try (Statement st = con.createStatement()) {
+//                       st.executeUpdate(CreateTableQuery);
+                           st.addBatch(CreateTableQuery);
+//                       st.executeUpdate(InsertFirstRow);
+                           st.addBatch(InsertFirstRow);
+//                       st.executeUpdate(InsertSecondRow);
+                           st.addBatch(InsertSecondRow);
+                           st.addBatch(CreateRecordQuery);
+//                       st.executeUpdate(CreateRecordQuery);
+                           st.executeBatch();
+                           con.commit();
+                           System.out.println("updation completed");
+                           return modulePayload;
+                       }
+//                       catch (Exception e) {
+//                           con.rollback();
+//                           System.out.println(e);
+//                           throw new RuntimeException(e);
+//                       }
+
+                   }
+                   else {
+//                       con.rollback();
+                       System.out.println("rolled back");
+                       throw new RuntimeException("error in updation");
+                   }
                }
            }
-           catch (Exception e){
+           catch (Exception e) {
                con.rollback();
-               System.out.println("failed");
+               throw new RuntimeException(e);
+           }
+           finally {
+               con.setAutoCommit(true);
            }
 
        } catch (Exception e) {
 
            System.out.println(e);
+           throw new RuntimeException(e);
        }
-
-       return null;
+//       return null;
 }
 
 public List<Map<String, Object>> getModulesByID(long ModuleID) throws SQLException {
@@ -176,7 +206,7 @@ public List<Map<String, Object>> getModulesByID(long ModuleID) throws SQLExcepti
                        Map<String,Object> objList = new HashMap<>();
 
                        int ColumnCount = rsdata.getColumnCount();
-                       for (int i =0;i<ColumnCount;i++){
+                       for (int i = 1;i<= ColumnCount;i++){
                            objList.put(rsdata.getColumnName(i),rs2.getObject(i));
                        }
                        recordList.add(objList);
@@ -190,27 +220,37 @@ public List<Map<String, Object>> getModulesByID(long ModuleID) throws SQLExcepti
        return recordList;
 }
 
-    public Module deleteModule(Module moduleData) {
+public Module deleteModule(Module moduleData) {
        try (Connection con = getConnection()) {
-
            con.setAutoCommit(false);
-           String DeleteQuery = "DELETE FROM Module WHERE RecordID = ?";
-           String DeleteTable = "DROP TABLE "+moduleData.getApiName()+"records";
-           try (PreparedStatement stMod = con.prepareStatement(DeleteQuery)){
-               stMod.setLong(1, moduleData.getRecordID());
-               int rs = stMod.executeUpdate();
-               if (rs != 0) {
-                   DeleteQuery = "DROP TABLE " + moduleData.getApiName();
-                   try (Statement st = con.createStatement()) {
-                       int rsDel = st.executeUpdate(DeleteQuery);
-                       int rsdel1 = st.executeUpdate(DeleteTable);
-                       con.commit();
-                   } catch (Exception e) {
-                       throw new RuntimeException(e);
-                   }
+           try {
+               String outboxQuery = "INSERT INTO outbox (aggregate, event_type, payload) VALUES (?, ?, ?)";
+               try (PreparedStatement Outpt = con.prepareStatement(outboxQuery)) {
+                   Outpt.setString(1, "MODULE");
+                   Outpt.setString(2, "DELETE");
+                   StringBuilder Builder = new StringBuilder(64);
+                   Builder.append("{\"moduleName\":\"").append(moduleData.getModuleName())
+                           .append("\",\"apiName\":\"").append(moduleData.getApiName()).append("\"}");
+                   Outpt.setString(3, Builder.toString());
+//                   Outpt.executeUpdate();
+                   if (Outpt.executeUpdate() <= 0) { throw new SQLException("Outbox failed"); }
                }
-               else {
-                   con.rollback();
+               String DeleteQuery = "DELETE FROM Module WHERE RecordID = ?";
+               try (PreparedStatement stMod = con.prepareStatement(DeleteQuery)) {
+                   stMod.setLong(1, moduleData.getRecordID());
+
+                    if(stMod.executeUpdate()>0) {
+                        String DeleteTable = "DROP TABLE " + moduleData.getApiName();
+                        try (Statement st = con.createStatement()) {
+                            st.addBatch(DeleteTable);
+                            st.addBatch(DeleteTable+"records");
+                            st.executeBatch();
+                            con.commit();
+                        }
+                    }
+                    else{
+                        throw new SQLException();
+                    }
 
                }
            }
@@ -218,8 +258,13 @@ public List<Map<String, Object>> getModulesByID(long ModuleID) throws SQLExcepti
                con.rollback();
                throw new RuntimeException(e);
            }
+           finally {
+               con.setAutoCommit(true);
+
+           }
 
        } catch (Exception e) {
+
            throw new RuntimeException(e);
        }
        return moduleData;

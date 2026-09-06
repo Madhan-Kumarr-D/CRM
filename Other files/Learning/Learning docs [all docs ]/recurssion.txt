@@ -1,0 +1,27 @@
+
+
+permutation
+
+class Solution {
+    public List<List<Integer>> permute(int[] nums) {
+        List<List<Integer>> res = new ArrayList<>();
+        boolean[] flag=new boolean[nums.length];
+        List<Integer> arr = new ArrayList<>();
+        permu(res,flag,nums,arr);
+        return res;
+    }
+    public void permu(List<List<Integer>> res,boolean[] flag,int[] nums,List<Integer> arr){
+        if(arr.size() == nums.length){
+            res.add(new ArrayList(arr));
+        }
+        for(int i=0;i<nums.length;i++){
+            if(!flag[i]){
+                flag[i]=true;
+                arr.add(nums[i]);
+                permu(res,flag,nums,arr);
+                arr.remove(arr.size()-1);
+                flag[i]=false;
+            }
+        }
+    }
+}
