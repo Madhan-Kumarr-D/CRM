@@ -28,9 +28,9 @@ public class FieldService {
         return field.createModuleField(moduleApiName,fieldData);
     }
 
-    public Field updateModuleField(String moduleApiName, Field fieldData) {
-    return field.updateModuleField(moduleApiName,fieldData);
-    }
+//    public Field updateModuleField(String moduleApiName, Field fieldData) {
+//    return field.updateModuleField(moduleApiName,fieldData);
+//    }
 
     public String deleteModuleField(String moduleApiName, Long fieldID) {
         return field.deleteModuleField(moduleApiName,fieldID);
