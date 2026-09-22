@@ -85,11 +85,11 @@ public class SecurityConfig {
                         )
                         .hasRole("ADMIN")
 
-                        .requestMatchers(
-                                HttpMethod.DELETE,
-                                "/api/v1/records/**"
-                        )
-                        .hasRole("ADMIN")
+//                        .requestMatchers(
+//                                HttpMethod.DELETE,
+//                                "/api/v1/records/**"
+//                        )
+//                        .hasRole("ADMIN")
 
                         // ADMIN only - modules.
                         .requestMatchers(
@@ -98,11 +98,11 @@ public class SecurityConfig {
                         )
                         .hasRole("ADMIN")
 
-                        .requestMatchers(
-                                HttpMethod.PUT,
-                                "/api/v1/modules/**"
-                        )
-                        .hasRole("ADMIN")
+//                        .requestMatchers(
+//                                HttpMethod.PUT,
+//                                "/api/v1/modules/**"
+//                        )
+//                        .hasRole("ADMIN")
 
                         .requestMatchers(
                                 HttpMethod.DELETE,
@@ -132,7 +132,8 @@ public class SecurityConfig {
 
         configuration.setAllowedOrigins(List.of(
                 "https://your-frontend-domain.com",
-                "http://localhost:3000"
+                "http://localhost:3000",
+                "http://localhost:5173"
         ));
 
         configuration.setAllowedMethods(List.of(

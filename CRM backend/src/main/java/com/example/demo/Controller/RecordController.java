@@ -6,7 +6,11 @@ import com.example.demo.Model.Field;
 import com.example.demo.Service.RecordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
+// centrall error handler
+// implement DTO
+// implement import jakarta.validation.constraints.*;// @NotBlank//@Size//@Pattern//@Email//@Min//@Max
+// allow listing implementation for api names
+// 13
 @RestController
 @CrossOrigin(origins = "http://localhost:5173")
 @RequestMapping("/api/v1")
